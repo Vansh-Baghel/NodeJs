@@ -1,10 +1,13 @@
-const http = require("http");
+const fs = require('fs');
 
-const server = http.createServer((req , res) => {
-    console.log(req);
-    res.end("Text from server side");
+fs.writeFile("./text.txt" , "This text is written from index.js" , "utf-8" , (err) => {
+    console.log("File written !! 😁");
 })
 
-server.listen(8000 , 'localhost' , () => {
-    console.log("Started port");
+fs.readFile("./greet.txt" , "utf-8" , (err , data) => {
+    console.log(data);
 })
+
+
+
+

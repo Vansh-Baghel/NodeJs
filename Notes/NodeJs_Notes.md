@@ -47,3 +47,12 @@ fs.readFile("./greet.txt" , "utf-8" , (err , data) => {
     console.log(data);
 });
 ```
+
+## createServer
+* This method is used to create a server.
+* We need to use http behind it ,
+```JS
+const http = require("http");
+http.createServer()
+```
+* We can mention the url of the website.
