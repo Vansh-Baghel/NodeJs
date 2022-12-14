@@ -56,3 +56,10 @@ const http = require("http");
 http.createServer()
 ```
 * We can mention the url of the website.
+
+## req.url 
+* In http , when we createServer , we have 2 parameters which are req and res .
+* If we used req.url , then it will give us the url of the website.
+
+## writeHead 
+* It takes 3 digit status code , 
