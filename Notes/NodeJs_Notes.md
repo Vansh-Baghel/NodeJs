@@ -40,7 +40,7 @@ fs.writeFile("./text.txt" , "This is text written from index.js " , 'utf-8' , er
 
 ## readFile
 
-- Used to read content of one file .
+- Used to read content of one file in async way.
 
 ```JS
 fs.readFile("./greet.txt" , "utf-8" , (err , data) => {
@@ -49,17 +49,102 @@ fs.readFile("./greet.txt" , "utf-8" , (err , data) => {
 ```
 
 ## createServer
-* This method is used to create a server.
-* We need to use http behind it ,
+
+- This method is used to create a server.
+- We need to use http behind it ,
+
 ```JS
 const http = require("http");
 http.createServer()
 ```
-* We can mention the url of the website.
 
-## req.url 
-* In http , when we createServer , we have 2 parameters which are req and res .
-* If we used req.url , then it will give us the url of the website.
+- All the content of the website , any changes in the routing , etc stuffs would be mentioned under this.
 
-## writeHead 
-* It takes 3 digit status code , 
+## req.url
+
+- In http , when we createServer , we have 2 parameters which are req and res .
+- If we used req.url , then it will give us the url of current page of the website.
+
+## url.parse(req.url, true)
+
+- Here url must be imported first like
+
+```JS
+const url = require('url');
+```
+
+- It is a method which returns the url object.
+- We can get the query string , pathname , href , etc important properties through which
+
+## writeHead
+
+- It takes 3 digit status code , which is used to display the header in the network tab.
+- Used to show the status.
+
+## Rules for Reading api files
+
+- Always read the api file above the callback function ie above the component function because whenever we visit that url , the api call will get refreshed which we don't want.
+- Read the api file at the top as a global variable.
+
+```JS
+const data = fs.readFileSync("./data.json" , 'utf-8');
+const dataObj = JSON.parse(data);
+
+// This is the main function of the component.
+const server = http.createServer((req , res) => {})
+
+```
+
+- Reason to use readFileSync and not readFile is that we can assign a variable to readFileSync which is easier to handle and use at different places and also we dont need to worry about waiting because it is used as global variabel so it will start running even before the API page is called . Once the hosting starts , API data will also be loaded.
+
+## /anyText/g
+
+- /g indicates all variables which are present .
+- If we want to replace all those variables we can use this way.
+
+```JS
+    output = output.replace(/{%IMAGE%}/g, product.image);
+```
+
+## \_\_dirname
+
+- This in node indicates the current directory in which we are in.
+
+## server.listen
+
+- Used to create the url of the server / website to start running.
+- Like localhost:8000.
+
+```JS
+server.listen(8000, 'localhost', () => {
+    console.log('Server Started');
+});
+```
+
+## Creating own modules
+
+- Creating own modules reduces the space in the same file.
+- Main thing is to break the bigger problems into smaller problems which is done by modules.
+
+## query String
+
+- The extra part after the ? in the url is called query string and we can see it using url.parse(req.url , true).
+
+```JS
+// http://localhost:8000/product?id=2
+// where query is   query: [Object: null prototype] { id: '2' }, so to use it, we use query.id
+```
+
+## application/json
+* It shows the plain text on the web page if we use it as writeHead.
+```JS
+res.writeHead(200, { 'Content-type': 'application/json' });
+
+```
+
+## text/html
+* It html format web page ie like normal web pages with proper styling if provided any.
+```JS
+res.writeHead(200, { 'Content-type': 'application/json' });
+
+```
