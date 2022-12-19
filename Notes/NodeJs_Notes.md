@@ -148,3 +148,21 @@ res.writeHead(200, { 'Content-type': 'application/json' });
 res.writeHead(200, { 'Content-type': 'application/json' });
 
 ```
+
+## Slugify 
+* It edits the query string part of the url.
+* We can give the name we want and hide the id=0 part of the url.
+* Can watch its documentation.
+* It does help with Search Engine Optimization (SEO).
+* If you want your website to rank high on Google search results, then url-slugs can help.  
+
+## HTTP request VS HTTP response
+* From client to web is HTTP request.
+* From web to client is HTTP response.
+
+## Get, post , patch , put
+* All of these are from client to web.
+* Get is used to request the data.
+* Post to send the data.
+* Patch and put to modify the data.
+
