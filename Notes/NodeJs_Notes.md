@@ -166,3 +166,13 @@ res.writeHead(200, { 'Content-type': 'application/json' });
 * Post to send the data.
 * Patch and put to modify the data.
 
+## interval exit reason
+* Whenever we use timer in our node.js file, the execution stops once the timer is reached.
+* It won't exit any server if its running. Else if there are just timers, we need to run the node from terminal everytime the timer stops.
+```JS
+setTimeout(() => console.log("2 sec"), 2000);
+```
+
+## Event Emitter and Event Listener
+* Emitter **emits name events** whenever something happens on web like **request is sent**, timer expires, etc.
+* Event Listener is used to **send the req and res** to the client side, and it is uses **server.on** which is an **instance of Emitter** which sends whatever action has been made like request event.
