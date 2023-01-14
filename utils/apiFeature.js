@@ -4,6 +4,21 @@ class APIfeatures {
     this.apiData = apiData;
     this.queryString = queryString;
   }
+  
+  filter() {
+    const queryObj = { ...this.queryString };
+    const excludedFields = ['page', 'sort', 'limit', 'fields'];
+    excludedFields.forEach(el => delete queryObj[el]);
+
+    // 1B) Advanced filtering
+    let queryStr = JSON.stringify(queryObj);
+    queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, match => `$${match}`);
+
+    this.apiData = this.apiData.find(JSON.parse(queryStr));
+
+    return this;
+  }
+
   sortApi() {
     if (this.queryString.sort) {
       const sortBy = this.queryString.sort.split(',').join(' ');
@@ -22,6 +37,7 @@ class APIfeatures {
 
     return this;
   }
+  
   pagination(){
     const page = this.queryString.page * 1 || 1;
     // Limit says the number of data in one page. Setting default as 100 datas.

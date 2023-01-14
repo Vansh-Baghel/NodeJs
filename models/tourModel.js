@@ -75,11 +75,49 @@ const tourSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // here startLocation and location includes same field, but we decided to keep them separate.
+    startLocation: {
+      type: {
+        type: String,
+        default: 'Point',
+        enum: ['Point'],
+      },
+      coordinates: [Number],
+      address: String,
+      description: String,
+    },
+    location: [
+      {
+        type: {
+          type: String,
+          default: 'Point',
+          enum: ['Point'],
+        },
+        coordinates: [Number],
+        address: String,
+        description: String,
+      },
+    ],
+    guides: [
+      {
+        type: mongoose.Schema.ObjectId,
+        ref: 'User',
+      },
+    ],
   },
   {
     toJSON: { virtuals: true },
   }
 );
+
+tourSchema.index({ price: 1, ratingsAverage: -1 });
+
+// Virtual Population
+tourSchema.virtual('reviews', {
+  ref: 'Review',
+  foreignField: 'tour',
+  localField: '_id',
+});
 
 // 1. Using Virtual Properties
 tourSchema.virtual('durationWeeks').get(function () {
@@ -87,20 +125,19 @@ tourSchema.virtual('durationWeeks').get(function () {
 });
 
 // 2. Using Document Middleware
-tourSchema.pre("save", function(next) {
-  this.slug = slugify(this.name, {lower: true})
+tourSchema.pre('save', function (next) {
+  this.slug = slugify(this.name, { lower: true });
   next();
-})
+});
 
 // 2. Using Query Middleware
-tourSchema.pre(/^find/, function(next) {
-
+tourSchema.pre(/^find/, function (next) {
   // Displays only the tours which are not equal to true ie not secretTour.
   // secretTour is defined in the Schema and is set as true by us while posting the secret tour document from the postman.
 
-  this.find({secretTour : {$ne : true}})
+  this.find({ secretTour: { $ne: true } });
   next();
-})
+});
 
 // tourSchema.post("save", function(doc, next) {
 //   console.log(doc);

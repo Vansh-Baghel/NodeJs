@@ -210,7 +210,7 @@ readable.pipe(res);
 })
 ```
 
-# Chp 6
+# Chp 6, 7 , 8 , 9
 
 ## Express
 
@@ -936,4 +936,582 @@ exports.getAllTours = catchAsync(async (req, res) => {
     data: tours,
   });
 });
+```
+
+# Chp 10
+
+## Create signin for user
+
+- Whenever we've created any tour, we used:
+
+```JS
+const tour = Tour.create(req.body)
+```
+
+- But to create user, we cannot use the same format of code because anyone can authenticate as admin and pass in the role as admin.
+- To make someone as admin, we manually add that line in the database.
+- So to fix this serious problem, we can specify the specific fields which must be imported from the user.
+
+```JS
+// In userRouter.js ie ie in any router
+// Didn't use route wala syntax because we won't be using any other method on authentication. //
+router.post('/signup' , jsonParser, authController.signup);
+
+// In authController.js ie in any controller
+// 1st way //
+  // Destructing the input object
+  const {name, email,password, passwordConfirm} = req.body;
+  const users = await User.create(name,email,password,passwordConfirm);
+
+// 2nd way
+  const users = await User.create({
+    name: req.body.name,
+    email: req.body.email,
+    password: req.body.password,
+    passwordConfirm: req.body.passwordConfirm,
+  });
+```
+
+## JWT
+
+![](./Resources/How-JWT-works.jpeg)
+
+- JsonWebToken is the **easiest** and **secured way of authenticating** and **authorizing** the user.
+- JWT are made using **Signature** which is made using **Secret String** (which we store in the env.js file) and **Header + Payload**.
+- Anyone can alter the JWT but JWT **stores the version** which **we created** and then **checks with the one which is passed**. If both Older Header & Payload and the Header & Payload received from the client **aint same** then it'll mean that **someone has altered** the data.
+- In this case, it will **not verify** the client as that user.
+- We can alter the Header and Payload on jwt.io and could also check the token, which will have same id as our \_id.
+- We can use these tokens to verify the user.
+
+![](./Resources/how-tomake-JWT.jpeg)
+
+## sign method of jwt
+
+- It takes parameters like **\_id of the user** (which is created by MongoDB whenever any data is saved), a **secret string** (which we define in env) and options which is not necessary.
+- In options, we can specify the expiresIn property which will automatically detact special codes like 90d where d is saved as day in sign method.
+
+## Error: Cannot set headers after they are sent to client
+
+- We will get this error if when we dont return the **next()** statement in the error block because it will then go to other middlewares as well and get multiple status and data which is not valid.
+
+## Passing Password security
+
+- To store user's password in the database, there are **few responsibilities** of developers to keep it safe.
+- We must set **select** as false which will **hide the password** from the document we receive from the **get** method therefore it will be **hidden on the client** side.
+- **passwordConfirm step** is really important, here we use document middleware **pre** to hide the password after its added and before its passed on the client side.
+- Run the document middleware only when **there are changes in the password**. Also, pre and post are only applicable for **save** and **create** and **not for post, get, etc** methods .
+- We must validate if the passwordConfirm entered is same as the password or not, using functions.
+- We use **bcrypt npm library** which is an **algorithm to convert** the **string** into **some hash coded** value.
+- Lastly, hide the **passwordConfirm** too by setting it as **undefined** because its work was just to confirm and not to store.
+
+```JS
+        password : {
+            type: String,
+            required : [true, "Please provide a password"],
+            minLength: [8, "Please Enter password with atleast 8 letters"],
+            select: false
+        },
+        passwordConfirm : {
+            type: String,
+            required : [true, "Please confirm your password"],
+            validate: {
+                validator: function (el) {
+                    return el === this.password;
+                },
+                message: "Passwords must match!!"
+            }
+        }
+
+        userSchema.pre("save", async function(next) {
+    // To only edit if the password is modified
+    if (!this.isModified('password')) return next();
+    else{
+//      Converting the password string in the database as random numbers. here 12 is the level of security, how safe it is.
+//      The high the number, more will the safety and more will be the time taken to convert into hash code.
+        this.password = await bcrypt.hash(this.password, 12);
+
+//      Converting passwordConfirm is set to undefined to hide it from the database, we don't really need to save the confirm,
+//      its work is to just compare both the passwords.
+        this.passwordConfirm = undefined;
+        next();
+    }
+})
+```
+
+## Explicitly adding password
+
+- Whenever we add **select** in the model as **false**, it hides that property from the document.
+- To add that property in the document, we can use **select method with + sign** which is the syntax to add password type fields:
+
+```JS
+
+  const user = await User.findOne({email}).select('+password');
+
+```
+
+## Checking the login
+
+- To check if the **user exist or not**, we need to get a **connection between** the database and the **user details** which were sent during login.
+- This connection is done **via email**, if **email matches** then we **check the password** and if thats **true** then we get access to its token and will load the data stored for that token.
+- For login, we must:
+  1. Check if **email and password is filled** or not
+  2. Check if the **email and password is correct from time of signup** or not .
+  3. If everything is ok , **send the token** to client
+- We can use **findOne method** to find if the email exist or not.
+
+```JS
+exports.login = catchAsync(async (req, res, next) => {
+  // Destructing from the body
+  const { email, password } = req.body;
+
+  // 1. Checking if email and password exists
+  if (!email || !password) {
+    return next(new AppError('Please provide email and password!! ', 404));
+  }
+
+  // 2. Check if the email and password is correct from first entered or not.
+  const user = await User.findOne({ email }).select('+password');
+
+  // const correct = await user.correctPassword(password, user.password);
+  // We need to add the correct variable body inside the if statement because user.password will not exist if there is no user,
+  // which will cause error.
+  if (!user || !(await user.correctPassword(password, user.password))) {
+    return next(new AppError('Incorrect email or password', 401));
+  }
+
+  // 3. Everything is ok , send the token to client
+  const token = signToken(user._id);
+
+  res.status(200).json({
+    status: 'success',
+    token,
+  });
+});
+```
+
+## Protecting before getting tours
+
+- We are **minimizing the users** which could get access to the tours, **without the authorization token**, it will **throw error**.
+- Steps to check it are:
+  1. **Get** the token and **check** if its there or not.
+  2. **Verify** the token.
+  3. Check if **user exist or not**.
+  4. If the **password** is **changed** then **token** must be **changed**.
+- In first step, we need pass the **authorization token** which starts with **Bearer** and contains the token of user.
+- In the second step, we decode the token and get the output as we get at jwt.io.
+- In third step, we find the user by using the decoded id which is same as the \_id stored in the data.
+- In the last step, we compare the dates of modification of password and its creation. If modification is greater than the creation, then we throw error that password has recently been changed, else we simply pass the token.
+- **decoded.iat** is the time of creation.
+
+```JS
+exports.protect = catchAsync(async (req, res, next) => {
+  let token;
+
+  // 1. Get the token and check if its there or not
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+
+  if (!token) {
+    return next(new AppError('You are not logged in! Please signup to create the account.', 401));
+  }
+
+  // 2. Verify the token
+  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  console.log(decoded);
+
+  // 3. Check if user exist or not
+  const freshUser = await User.findById(decoded.id);
+  if (!freshUser) {
+    return next(new AppError('The user which belongs to this token no longer exist.'));
+  }
+
+  // 4. If the password is changed then token must be changed
+  if (freshUser.changedPasswordAfter(decoded.iat)) {
+    return next(new AppError('User recently changed the password! Please login again.', 401));
+  }
+
+  // Here it is saving the req.user data, otherwise in all the methods after this, req.user will be undefined.
+  req.user = freshUser;
+  next();
+});
+```
+
+## Restricting roles
+
+- We can allow only few roles to perform certain tasks, like delete could only be done by **admin and lead**.
+
+```JS
+
+// in tourRouter
+  .delete(
+    jsonParser,
+    authController.restrictTo('admin', 'lead-guide'),
+    tourController.deleteTour
+  );
+
+// in authController
+exports.restrictTo = (...roles) => {
+  return (req, res, next) => {
+    // role will be admin and lead-guide
+    if (!roles.includes(req.user.role)) {
+      return next(new AppError('You do not have permission to perform this action', 403));
+    }
+    next();
+  };
+};
+```
+
+## Forget password handling
+
+- When a user forgets the password, there are few standard steps that are followed.
+- Those steps are: Entering the email, sending gmail message on that email to change the password and confirm the password.
+- STEPS:
+  1. Once the user enters the email, developers check if this email exist in the database or not.
+  2.
+  - If it does, then we send the **new reset token** to the user and that token be stored in the model as decripted string. This decription could be done using **crypto**.
+  * **Crypto** is another way of decripting any string just like brcypt (which we use for password) but as we dont need high safety measures in it, no need to use bcrypt. crpyto is just little less secured but faster.
+  * After we generate the newToken, we need to save it in the next step.
+  3. Lastly, we send the user the token with some message. We will have these methods defined in userModel files and will access it in userController.
+- We use [mailtrap.io](https://mailtrap.io/inboxes) for this which fakes sending the email to theh users but gets trapped the emails in the development inbox which we could see.
+- We have to save its PORT, USERNAME, PASSWORD and HOST in the env file and use it in email.js file.
+- We are setting the **encrypted token** in the **database** and **sending another token** to the **user** so that if hacker gets **access to the database**, then the **token couldnt be used** to change someone's password.
+- Then email will be received at **mailtrap website** if proper PORT, USERNAME, PASSWORD and HOST were provided.
+- In the database, we will see 2 new properties been added, which would be **passwordResetToken** and **passwordResetExpires**, and **both will be cleared** if the **resetPassword fails** or if the **time expires**.
+
+```JS
+
+// in authController
+exports.forgotPassword = catchAsync(async (req, res, next) => {
+  // 1) Get user based on POSTed email
+  const email = req.body.email;
+  const user = await User.findOne({ email });
+  if (!user) {
+    return next(new AppError('There is no user with email address.', 404));
+  }
+
+  // 2) Generate the random reset token
+  const resetToken = user.createPasswordResetToken();
+  await user.save({ validateBeforeSave: false });
+
+  // 3) Send it to user's email
+  const resetURL = `${req.protocol}://${req.get(
+    'host'
+  )}/api/v1/users/resetPassword/${resetToken}`;
+
+  const message = `Forgot your password? Submit a PATCH request with your new password and passwordConfirm to: ${resetURL}.\nIf you didn't forget your password, please ignore this email!`;
+
+  try {
+    await sendEmail({
+      email,
+      subject: 'Your password reset token (valid for 10 min)',
+      message
+    });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Token sent to email!'
+    });
+  } catch (err) {
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    return next(
+      new AppError('There was an error sending the email. Try again later!'),
+      500
+    );
+  }
+});
+
+// in email.js
+const nodemailer = require('nodemailer');
+
+const sendEmail = async(options) => {
+  // 1. Create transporter
+  const transporter = nodemailer.createTransport({
+    host: process.env.EMAIL_HOST,
+    port: process.env.EMAIL_PORT,
+    auth: {
+      user: process.env.EMAIL_USERNAME,
+      pass: process.env.EMAIL_PASSWORD,
+    },
+  });
+
+  // 2. Define email options
+  const mailOptions = {
+    from : "Vansh Baghel",
+    to: options.email,
+    subject: options.subject,
+    text: options.message
+  }
+
+  // 3. Actually send the email
+  await transporter.sendMail(mailOptions);
+};
+
+module.exports = sendEmail;
+
+```
+
+## jwt malformed error
+
+- This is caused when your authentication is not defined to the token.
+- When we set the tests in Postman, make sure to set the path correctly.
+
+```JS
+// Output in console
+{
+    "status": "success",
+    "data": {
+        "user": "63b1425b1407f2af260ed31c",
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjYzYjE0MjViMTQwN2YyYWYyNjBlZDMxYyIsImlhdCI6MTY3Mjc0MDA2NCwiZXhwIjoxNjgwNTE2MDY0fQ.gvEXsM0UaXeDXHhhVl6OH93pLM8MrByfd-sNYxgClkk"
+    }
+}
+
+// In Tests in postman (Corrected one)
+pm.environment.set("jwt", pm.response.json().data.token);
+
+// In Tests in postman (Wrong one)
+pm.environment.set("jwt", pm.response.json().token);
+```
+
+## Cookies
+
+- It is a piece of text which server sends to clients and when clients receives it, it gets saved automatically and return it with all further requests to the server.
+- res.cookie accepts cookieName, token/content to be stored and conditions.
+
+```JS
+const createSendToken = (user, statusCode, res) => {
+  const token = signToken(user._id);
+  const cookieOptions = {
+    expires: new Date(Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000),
+    // Will open only on http web pages.
+    httpOnly: true,
+  }
+
+  res.cookie('jwt', token, cookieOptions);
+}
+```
+
+## Setting limit
+
+- This is done so that if there are any attacks on website for guessing any number of passwords, then it must show error after few number of tryouts.
+- We use express-rate-limit npm package and pass the max number of try a user could give till a reload, and the time in millisecond which the user needs to be waited if the limit exceeds.
+- Reset means that the login or logout has been done.
+
+```JS
+// In app.js
+const rateLimit = require('express-rate-limit');
+
+const limiter = rateLimit({
+    max: 100,
+    windowMs: 60 * 60 * 100,  // Setting for 1 hour
+    message: "Too many requests from this IP, please try again after an hour!"
+})
+// Will affect all routes starting with api
+app.use('/api', limiter);
+
+```
+
+## Sanitizing inputs
+
+- When we use {$gt : ""} in the email input field, it accepts the user if the password matches with another user.
+- To prevent these types of unknown errors, we use **express-mongo-sanitize**.
+
+## xss-clean
+
+- If anyone tries to write HTML code in the input field, then it can cause error.
+- So XSS converts that code into safe String.
+
+## Prevent Parameter Pollution
+
+- Whenever we pass multiple conditions in url like `{{URL}}api/v1/tours?ratingsAverage=2&ratingsAverage=6`, then it may cause error because it stores value 2 and 6 (here) as array elements.
+- We've used .split and .join methods which are for strings and not for arrays.
+- Therefore to prevent this, we use **hpp** npm package.
+- It will only accept the last condition and will not give error.
+- To be able to use all conditions, we can use whitelist in it .
+- So both 2 and 6 will be used.
+
+# Chp 11
+
+## Data Modelling
+
+- Data Modelling is taking an **unstructured data** which depends on our **web page requirement** and then **structuring it into logical data model** inside database.
+- There are different relationships between the data in the database ie how are they linked to each other.
+
+  ![](./Resources/Types-of-relationships.jpeg)
+
+- Referenced and Embedded both are supported in MongoDB. Embedded is supported as MongoDB is noSQL query language.
+  ![](./Resources/Referencing-VS-Embed.jpeg)
+
+- When to use Referenced or Embedded depends on these points:
+  ![](./Resources/When-to-EmbedOrReference.jpeg)
+
+- There are different ways of referencing:
+  ![](./Resources/Types-of-References.jpeg)
+
+- Summary :
+
+  ![](./Resources/Summary_of_DataModelDesign.jpeg)
+
+## Referencing
+
+- We can reference any property in a Model by passing a **type** and **ref** properties in the model.
+
+```JS
+    guides : [{
+      // where ObjectId refers to inbuilt _id
+      type: mongoose.Schema.ObjectId,
+      ref: 'User'
+    }]
+```
+
+## Populate
+
+- Whenever we want to show full data from a small part of a data like its id, then we can use Populate.
+- It slows down the website if there are many calls of this method because it creates a new query which will only be seen in the document and not in the DB.
+- We can add it in front of any method we want to use, also could add it in the Model file as a query middleware function.
+- Middleware just takes 50 or 100ms more time then regular one.
+- We could also specify the fields which must be visible using select property.
+
+```JS
+// 1. Method 1
+// In reviewController
+  const reviews = await Review.find().populate('tour');
+
+// In reviewModel as query Middleware
+// 2. Method 2
+
+reviewSchema.pre(/^find/ , function(next) {
+    this.populate({
+        path: 'tour',
+        select: 'name'
+    }).populate({
+        path: 'user',
+        select: 'name '
+    })
+
+    next();
+})
+```
+
+## Virtual populate
+
+- We **don't need to populate tour inside the reviews** because when we **populate reviews inside get tours**, then there will be **double tours** and any other array inside it.
+- This will lead to **chain of populates** inside our document which is **not at all efficient**.
+- Therefore instead of **populating tour and user** in reviews, we can **populate only user** and use **Virtual populate** to **populate reviews** inside the tour.
+- This will show details of reviews inside getAllTours but only the **id of tour** which is present inside **reviews string** of reviewModel.
+- **foreignField** and **localField** are the ways of connecting 2 different models where **both have same data** and **foreignField** means the **data property name inside the ref** and **localField** means that **data inside the current model**.
+- Here foreignField: 'tour' because in reviewModel, tour contains id of the tour and the localField: '\_id' which is the id of tour.
+
+```JS
+// In reviewModel.js
+reviewSchema.pre(/^find/ , function(next) {
+    this.populate({
+        path: 'user',
+        select: 'name '
+    })
+    next();
+})
+
+// In tourModel.js
+
+// Virtual Population
+tourSchema.virtual('reviews', {
+  ref: 'Review',
+  foreignField: 'tour',
+  localField: '_id'
+})
+
+```
+
+## Nested Routes
+
+- This means we **pass** the id or any other **unique data** in the **url itself**.
+- We can use this url id to **set default id** in other **controller** like we are **connecting tour controller** and **review controller** and setting the **tourId as params** and adding the tour id in the url which could be used by **reviewController** to set the id of the tour.
+- To get access in **reviewRouter** from **tourRouter**, we use **mergeParams** which will help us to use tourId in reviewController via reviewRouter.
+  > We **use** the router in the one we set the param, here in tourRouter we are using **router.use**.
+
+```JS
+// In reviewRouter
+const router = express.Router({mergeParams: true});
+
+router
+  .route('/')
+  .get(reviewController.getAllReviews)
+  .post(jsonParser, authController.protect, authController.restrictTo('user'), reviewController.createReview);
+
+// In tourRouter
+router.use('/:tourId/reviews', reviewRouter);
+
+// In reviewController
+exports.createReview = catchAsync(async (req, res) => {
+    if (!req.body.tour) req.body.tour = req.params.tourId;
+  if (!req.body.user) req.body.user = req.user.id;
+
+  const inputData = {
+    review: req.body.review,
+    rating: req.body.rating,
+    createdAt: req.body.createdAt,
+    tour: req.body.tour,
+    user: req.body.user,
+  };
+});
+```
+
+## Factory Function
+
+- It is a great way of representing same type of functions from once place to every file.
+- We can use the same piece of code to perform operations like delete, post, etc.
+
+```JS
+// In handlerFactory
+exports.deleteOne = (Model) =>
+    catchAsync(async (req, res, next) => {
+    const doc =  await Model.findByIdAndDelete(req.params.id);
+
+    if (!doc) return next(new AppError('No document found with this ID', 404));
+
+  res.status(204).json({
+    status: 'success',
+    data: null
+  });
+});
+
+// In tourController
+exports.deleteTour = factory.deleteOne(Tour);
+
+```
+
+## Middleware sequence and authentication
+
+- We must know that middleware runs in sequence.
+- So if we use any file at the top, then all the middlewares below it will be affected.
+- In the example below, both patch and get router middlewares are affected/protected by authController.protect file.
+
+```JS
+router.use(authController.protect);
+
+router.patch('/updateMyPassword', jsonParser, authController.updateMyPassword);
+router.get('/me', userController.getMe, userController.getUser);
+
+
+// Its same as:
+router.patch('/updateMyPassword', jsonParser, authController.protect , authController.updateMyPassword);
+router.get('/me', userController.getMe, authController.protect , userController.getUser);
+```
+
+## Perfomance improve using Indexes
+
+- It is a **1 liner code** which we can **write in our Model** files which **can boost** our website performance.
+- When we want to filter anything, it'll search every data behind the scenes and will return only those data which meets the condition, but this is not efficient in larger code bases.
+- We can see this by explain() method which return the number of outputs and number of checked data to get that output.
+- To **optimize** it, we can use **index method** in our schema.
+
+```JS
+
+// In tourModel.js
+tourSchema.index({ price: 1, ratingsAverage: -1 });
+
 ```

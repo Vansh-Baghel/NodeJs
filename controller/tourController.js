@@ -2,14 +2,8 @@ const fs = require('fs');
 // const toursRead = JSON.parse(fs.readFileSync(`${__dirname}/../dev-data/data/tours-simple.json`));
 const Tour = require('../models/tourModel');
 const APIfeatures = require('../utils/apiFeature');
-
-const catchAsync = (fn) => {
-  // Here return is used because we want to stop the middleware from executing after this. Otherwise it would continue
-  //  to go to other middlewares.
-  return (req, res, next) => {
-    fn(req, res, next).catch(next);
-  };
-};
+const catchAsync = require('../utils/catchAsync');
+const factory = require('./handlerFactory');
 
 // Middleware function
 exports.top5Cheap = (req, res, next) => {
@@ -20,27 +14,6 @@ exports.top5Cheap = (req, res, next) => {
   next();
 };
 
-exports.getAllTours = catchAsync(async (req, res) => {
-  const features = new APIfeatures(Tour.find(), req.query).sortApi().limitingFields().pagination();
-  const tours = await features.apiData;
-
-  res.status(200).json({
-    status: 'success',
-    dataSize: tours.length,
-    data: tours,
-  });
-});
-
-exports.getTour = catchAsync(async (req, res) => {
-  const tour = await Tour.findById(req.params.id);
-  // const tour = Tour.findOne({_id: req.params.id})
-
-  res.status(200).json({
-    status: 'success',
-    data: { tour },
-  });
-});
-
 exports.createTour = catchAsync(async (req, res) => {
   const newTour = await Tour.create(req.body);
   res.status(200).json({
@@ -48,34 +21,6 @@ exports.createTour = catchAsync(async (req, res) => {
     data: {
       tour: newTour,
     },
-  });
-});
-
-exports.updatingTours = catchAsync(async (req, res) => {
-  const tour = await Tour.findByIdAndUpdate(req.params.id, req.body, {
-    runValidators: true,
-  });
-  // Checking if the body property exists as the property in the data or not.
-  if (tour.get(Object.keys(req.body).toString()) === undefined) {
-    res.status(404).json({
-      status: 'Invalid',
-      message: "Invalid key name, it doesn't exist in toursDB",
-    });
-  } else {
-    res.status(200).json({
-      status: 'success',
-      data: {
-        tour: tour,
-      },
-    });
-  }
-});
-
-exports.deleteTour = catchAsync(async (req, res) => {
-  await Tour.findByIdAndDelete(req.params.id);
-
-  res.status(204).json({
-    status: 'success',
   });
 });
 
@@ -144,3 +89,8 @@ exports.getMonthlyPlan = catchAsync(async (req, res) => {
     },
   });
 });
+
+exports.updatingTours = factory.updateOne(Tour);
+exports.deleteTour = factory.deleteOne(Tour);
+exports.getAllTours = factory.getAll(Tour);
+exports.getTour = factory.getOne(Tour, { path: 'reviews' });
